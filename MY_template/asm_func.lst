@@ -1,0 +1,51 @@
+
+
+
+ARM Macro Assembler    Page 1 
+
+
+    1 00000000                 AREA             ASM_func, CODE, READONLY
+    2 00000000         
+    3 00000000         
+    4 00000000         nome_fne
+                               PROC
+    5 00000000                 EXPORT           nome_fne
+    6 00000000         
+    7 00000000 E92D 4DF0       PUSH             {R4-R8,R10-R11,LR}
+    8 00000004         
+    9 00000004 E8BD 8DF0       POP              {R4-R8,R10-R11,PC}
+   10 00000008                 ENDP
+   11 00000008         
+   12 00000008         
+   13 00000008                 END
+Command Line: --debug --xref --diag_suppress=9931 --cpu=Cortex-M3 --apcs=interw
+ork --depend=.\asm_func.d -o.\asm_func.o -I.\RTE\_Target_1 -IC:\Users\jacop\App
+Data\Local\Arm\Packs\ARM\CMSIS\5.9.0\CMSIS\Core\Include -IC:\Users\jacop\AppDat
+a\Local\Arm\Packs\Keil\LPC1700_DFP\2.7.1\Device\Include --predefine="__EVAL SET
+A 1" --predefine="__UVISION_VERSION SETA 536" --predefine="_RTE_ SETA 1" --pred
+efine="LPC175x_6x SETA 1" --predefine="_RTE_ SETA 1" --list=.\asm_func.lst ASM_
+func.s
+
+
+
+ARM Macro Assembler    Page 1 Alphabetic symbol ordering
+Relocatable symbols
+
+ASM_func 00000000
+
+Symbol: ASM_func
+   Definitions
+      At line 1 in file ASM_func.s
+   Uses
+      None
+Comment: ASM_func unused
+nome_fne 00000000
+
+Symbol: nome_fne
+   Definitions
+      At line 4 in file ASM_func.s
+   Uses
+      At line 5 in file ASM_func.s
+Comment: nome_fne used once
+2 symbols
+336 symbols in table

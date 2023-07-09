@@ -1,0 +1,467 @@
+Direttive comuni
+
+- AREA nome, attributo1, attributo2... 	→segmento di codice o data con attributi indicati.
+	Attributi:
+	- CODE 
+	- DATA
+	- READONLY
+	- READWRITE
+	- ALIGN = n 	→dichiara l'allineamento di 2^n byte
+- label SPACE qtà 	→riserva qtà byte vuoti
+- label xxx valore1, valore2 	→memorizza 1 unità definita da xxx per ogni valore in elenco
+	Unità:
+	- DCB : byte
+	- DCW : half-word (2 byte)
+	- DCD : word (4 byte)
+- label EQU espressione 	→associa una costante alla label
+- END	→fine file
+
+----------------------------------------------
+COSTANTI E LITERAL POOL
+
+- MOV r0, rn/#imm, shift		→muove un immediate o il valore di un registro in un altro registro. NON PUò MUOVERE DIRETTAMENTE DA MEMORIA
+	shift possibili:
+	- ASR arithmetic shift right (il MSB è uguale al precedente →mantiene il segno)
+	- LSL logical shif left →moltiplica
+	- LSR logical shift right →divide
+- LDR rd, =imm/=label 
+
+----------------------------------------------
+MEMORY
+
+- LDR/STR	word
+- LDRB/STRB	byte
+- LDRH/STRH	half word
+- LDRD/STRD 2 words		→LDRD/STRD rd1, rd2, base_address
+- LDM/STM	multiple words
+
+Addressing mode
+- load/store rd, [ rn, offset/rm, shift] {!}	→pre-indexed
+	base_address = rn + (offset/rm shiftato). 
+	Se c'è "!" rn viene aggiornato a quel valore dopo l'istruzione (solo con offset costanti).
+- load/store rd, [rn], offset/rm				→post-indexed
+	base address = rn.
+	rn viene sempre aggiornato dopo l'istruzione.
+	
+----------------------------------------------
+BRANCH
+
+- B label			→da label
+- BX rn				→da registro
+- BL label			→da label e link
+- BLX rn			→da registro e link
+Il link è salvato in r14 (LR)
+
+CONDIZIONI SLIDE 5
+- equal EQ
+- not equal NE
+- signed >= GE
+- signed > GT
+- signed <= LE
+- signed < LT
+
+
+----------------------------------------------
+SUBROUTINES
+
+LDMxx/STMxx rn{!}, {rm, rj, rk-ry}
+	La lista di registri ha le parentesi, "!" è opzionale.
+	SP non è possibile inserirlo in lista.
+	PC e LR sono mutualmente esclusivi.
+	I registri in lista sono sempre ordinati in ordine crescente.
+	xx indica l'addressing mode:
+		- IA : increment after →prima accede, poi incrementa il registro base
+		- DB : decrement before →prima decremento il registro base poi accedo alla memoria.
+		
+Lo stack ARM è FULL DESCENDING: lo SP diminuisce inserendo elementi + lo SP punta al primo elemento già utilizzato.
+→ si usa:
+	- push: STMDB o PUSH {reg_list}
+			→uguale a STMDB SP!, {reg_list}
+	- pop: 	LDMIA o POP {reg_list}
+			→uguale a LDMIA SP!, {reg_list}
+			
+PASSAGGIO DI ARGOMENTI
+- r0-r3 usati come argomenti da passare alle fni
+- r0,r1 usati come ritorno delle fni
+- r4-r8, r10, r11, SP sono salvati dalla fne chiamata
+
+
+--------------------------------
+SUPERVISOR CALLS
+
+SVC #immediate
+	genera un interrupt software SVC con immediate come tag per differenziarne vari tipi.
+	
+Quando il processore inizia a gestire un interrupt:
+1- push automatico dello stack frame: r0-r3,r12,lr,pc,psr push in ordine decresente.
+2- LR è aggiornato con un inidrizzo fittizio EXC_RETURN che specifica il contesto di ritorno.
+
+Per recuperare il tag della SVC chiamata:
+	LDR R0, [SP,#24]	;carica in R0 il vecchio PC (salvato in stack) = istruzione successiva alla SVC call
+	LDR R1, [R0,#-4]	;carica in R1 l'istruzione SVC call
+	BIC R1, #FF000000	;and bit a bit con immediate
+	LSR R1, #16			;shift R1 a sinistra di 16 posizioni
+	
+Per ritornare:
+	BX LR
+Finito l'handling il processore si accorge che nel LR non c'è un indirizzo ma le exit mode e torna in automatico mediante una return sequence
+
+
+OPERATING MODES
+- thread mode: normale esecuzione di un programma
+- handler mode: in gestione di eccezione		→sempre priviledged
+
+- user status: accesso alle risorse limitato
+- priviledged status: accesso a tutte le risorse
+
+- MSP: main stack pointer. Di default il programma parte con quello.
+- PSP: process stack pointer. Per usare quello nel programma va cambiato manualmente all'inizio.
+
+
+REGISTRI SPECIALI
+MSR special_r, rn
+	Quando in priviledged mode posso modificare registri speciali spostandoli da rn.
+	
+CONTROL[1] =
+	- 0	in entrambi 	→	usato il MSP	→usato il main stack (di default è questo ed è unico)
+	- 1	in thread mode	→	usato il PSP	→usato il process stack
+CONTROL[0] =
+	- 0 in thread mode	→	priviledged status
+	- 1 in thread mode	→	user status
+
+
+DEFINIRE LO STACK INIZIALE A INIZIO PROGRAMMA (MAIN E PROCESS)
+Stack_Size 		EQU 0x00000200
+				AREA STACK, NOINIT, READWRITE, ALIGN=3
+				SPACE Stack_Size/2							; fine del process stack
+Stack_Process 	SPACE Stack_Size/2							; fine del main stack
+__initial_sp		
+
+
+INIZIALIZZAZIONE DEL PROGRAMMA
+MOV	R0, #3					
+MSR	CONTROL, R0				;setto il registro CONTROL a 0...011 → entro in user status e uso il PSP
+LDR	SP, =Stack_Process		;PSP settato al giusto indirizzo di partenza
+...
+SVC	0x10					;chiamando la SVC passo in handler mode e MSP
+										; MSP = __initial_sp in automatico
+
+HANDLER
+PUSH 	{R0-R12, LR}		;salvo i dati
+MRS 	R1, PSP				;recupero il PSP
+LDR 	R0, [R1, #24]		;
+LDR 	R0, [R0,#-4]		;
+BIC 	R0, #0xFF000000		;
+LSR 	R0, #16				;recupero l'immediate
+...my_code...
+POP 	{R0-R12, LR}		;estraggo i dati
+BX 		LR					;ritorno
+
+
+--------------------------------
+C+ASM
+
+startup.s :
+IMPORT main			//IMPORT importa l'indirizzo esterno dagli altri file
+LDR R0, =main
+BX R0
+
+main.c:
+main(){
+...
+}
+
+CHIAMATE A FNI ASM
+- inline:  			__ASM("fne");
+- esterna:			r = ASM_funct(parametri);
+I parametri sono salvati in ordine su r0-r3 e sullo stack.
+I risultati sono passati su r0-r1
+
+Direttive:
+	- EXPORT →rende una fne visibile agli altri file
+	- IMPORT →rende una fne visibile da un file esterno
+	- extern →importa una variabile da un file esterno
+
+volatile : aggettivo da aggiungere a variabile per permettere la modifica al di fuori del programma che l'ha istanziata
+
+--------------------------------
+LPC17xx
+
+Frequenze iniziali:
+	- CPU: 100 MHz
+	- UART and TIMERS: 25 MHz
+
+	
+LEDs
+LED4→P2.7, LED5→P2.6, ..., LED11→P2.0
+
+	Pin connect block (pg 119)
+	LPC_PINCON->PINSEL4 	&= 0xFFFF0000		//and bit a bit con valore precedente
+	Per ogni pin imposta la funzione. Impostiamo a 00 (utilizzo: GPIO) tutti i bit che riguardano porte 2.0-2.7 (registro PINSEL4 bit 0-15).
+
+	FIODIR
+	LPC_GPIO2->FIODIR		|= 0x000000FF		//imposto i led su port 2 come output
+	Per ogni GPIO setta la direzione (se è di input o di output).
+	
+	FIOPIN
+	Dal registro si leggono gli stati dei pin settati come INput
+	
+	FIOSET
+	Il registro permette di settare gli stati dei pin se settati come OUTput
+
+
+BUTTONs
+INT0 → P2.10/EINT0, KEY1 → P2.11/EINT1, KEY2 → P2.12/EINT2
+	stati:
+		-rilasciato: 	1
+		-press: 		0
+	
+	Pin connect block
+	LPC_PINCON->PINSEL4	|= (1<<20);
+	LPC_PINCON->PINSEL4	|= (1<<22);
+	LPC_PINCON->PINSEL4	|= (1<<24);
+	Impostiamo a 01 i bit corrispondenti (PINSEL 4 bit 20-21, 22-23, 24-25) per settare utilizzo a external interrupt
+
+	FIODIR
+	LPC_GPIO->FIODIR	&= ~(1<<10);
+	LPC_GPIO->FIODIR	&= ~(1<<11);
+	LPC_GPIO->FIODIR	&= ~(1<<12);	//tilde=NOT
+	Settiamo a 0=input il bit di direzione dei pulsanti.
+	
+	EXTMODE
+	LPC_SC->EXTMODE = 0x7
+	Imposta i pulsanti come edge sensitive (0=level sens, 1=edge sens).
+	
+	Enable degli interrupt dei pulsanti
+	NVIC_EnableIRQ(EINT2_IRQn);
+	NVIC_EnableIRQ(EINT1_IRQn);
+	NVIC_EnableIRQ(EINT0_IRQn);
+	
+	Interrupt handlers
+	Hanno lo stesso nome di quelle già presenti nella external interrupts vectors table di ASM. (sovrascritte quelle in ASM perchè [WEAK]).
+	LPC_SC->EXTINT	|= (1<<0); 		//EINT0. La logica funziona al contrario (trigger sull'edge 1→0).
+	LPC_SC->EXTINT	|= (1<<1);		//EINT1 =KEY1
+	LPC_SC->EXTINT	|= (1<<2);		//EINT2 =KEY2
+	Alla fine devo settare il giusto bit del registro EXTINT a 0 per resettare il proprio flag di interrupt e permettere di ri-triggerarlo.
+	
+	EXTINT
+	Registro che mantiene i flag degli external interrupt attivi. Bit 0→EINT0 , 1→EINT1, 2→EINT2
+	
+	
+--------------------------------
+INTERRUPT CONTROLLER
+
+NVIC_SetPriority(nomeIRQ, prio) 	//più basso il valore, più alta la prio
+
+--------------------------------
+TIMERS
+
+	Principio di counting che segue il clock.
+	Registri appositi mantengono il valore da raggiungere per considerare il timer concluso.
+
+	- Standard timers: sincronizzati da peripheral clock, hanno a disposizione 4 match registers.
+	- Match registers: 32 bit memorizzano il valore che il timer deve raggiungere per triggerare (opzionale) un interrupt. Diverse opzioni:
+		- Continua o stop il timer al match.
+		- Reset o no timer al match.
+	Tutti e 4 inviano un unico tipo di interrupt. Si differenziano leggendo l'IR.
+	- Capture signals: registri che possono acquisire il valore del timer alla transizione del capture pin e eventualmente triggerare un interrupt.
+	- Prescale register: utile per aumentare il valore massimo del timer. Il timer register anzichè incrementar eogni cc, incrementa ogni volta che il prescale timer fa match con il prescale register.
+	count = time[s] * Freq / (PrescaleRegister + 1)
+
+MATCH CONTROL REGISTER
+	Serve a impostare il comportamento del match di un match register.
+	3 bit per match register
+	
+	- bit Interrupt	[0,3,6,9] =
+		1	:il match genera un interrupt
+		0	:match non genera interrupt
+	- bit Reset		[1,4,7,10] =
+		1	:il match resetta il counter.
+		0	:no reset.
+	- bit Stop 		[2,5,8,11]=
+		1	:ferma il counter dopo il match.
+		0	:non ferma il counter.
+		
+TIMER CONTROL REGISTER
+	Imposta il comportamento del counter (sia prescale che timer)
+	
+	- bit Enable	[0] =
+		1	:counters abilitati
+		0	:counters disabilitati
+	- bit Reset		[1] =
+		1	:i due counters resettati al prossimo cc
+
+INTERRUPT REGISTER
+	Memorizza i flag di interrupt per ogni match register e capture register.
+	Quando un register triggera un interrupt il corrispettivo flag viene settato a 1.
+	bits: 0→MR0 interrupt , 1→MR1 interrupt , ... , 4→CR0 interrupt , 5→CR1 interrupt.
+	
+Nel main:
+init_timer(numero, secondi);			//inizializza
+enable_timer(numero);					//abilita
+
+Nella lib lib_timer imposto i valori dei registri per settare le caratteristiche.
+
+	
+--------------------------------
+SWITCH DEBOUNCING
+
+Principio: rileggere dopo un delay dal primo segnale. Se è concorde, triggerare l'interrupt.
+Sfrutta il repetitive interrupt timer.
+Handler del button com il debouncing:
+
+***********************************************************
+VERSIONE CON 1 PULSANTE GESTITO
+
+Nel main:
+init_RIT(0x4c4b40)							//inizializza RIT a 50 ms
+
+EINTx_IRQHandler(){
+	enable_RIT();							//abilita il RIT per le prima volta
+	NVIC_DisableIRQ(EINTx_IRQn);			//disabilita l'interrupt di quel pulsante. x = numero del pulsante
+	LPC_PINCON->PINSEL4		&= ~(1 << 22);	//Setta la funzione del button a general (non più interrupt). 22 per eint1. Per altri vedi sezione buttons.
+	LPC_SC->EXTINT			&= (1 << 1);	//pulisce flag interrupt. 1 per EINT1. Per altri vedi IR.
+}
+
+
+
+void RIT_IRQHandler (void){			
+	static int down=0;							
+	down++;										//down inizia a 0 la prima iterazione dell'handler. Le 	successive viene aumentato
+	
+	if((LPC_GPIO2->FIOPIN & (1<<11)) == 0){		//se il bottone è ancora premuto: 11esimo bit FIOPIN ==0 per pulsante 1. Per altri guarda tabella FIOPIN.
+			
+		reset_RIT();							//resetto RIT per poter triggerare un nuovo RIT
+		switch(down){
+			case 1:								//se è la prima iterazione → gestisco la pressione del pulsante
+			
+				//gestione evento pressione
+			
+			default:							//se non è la prima iterazione
+				//gestione pressione prolungata, iterazioni successive. Evento pressione già gestito.
+		}
+	}
+	else {										//se il bottone non è più premuto
+		down=0;									//reset down
+		disable_RIT();							
+		reset_RIT();							//azzera e spegni RIT
+		NVIC_EnableIRQ(EINTx_IRQn);				//abilita di nuovo l'interrupt iniziale del pulsante
+		LPC_PINCON->PINSEL4    |= (1 << 22);    //ri-set della funzione del pin 22 a external interrupt. 22 per EINT1. Per gli altri guarda PINSEL4.
+		
+	}
+		
+	
+  LPC_RIT->RICTRL |= 0x1;						//reset flag interrupt RIT.
+	
+  return;
+}
+
+
+***********************************************************
+VERSIONE CON PIÙ PULSANTI GESTITI (anche premuti in contemporanea)
+
+Nel main:
+init_RIT(0x4c4b40)							//inizializza RIT a 50 ms
+enable_RIT();								//abilito il RIT dal reset del sistema. Gira continuamente.
+
+In IRQ button:
+extern int down_0;
+extern int down_1;
+extern int down_2;
+
+EINTx_IRQHandler(){
+	down_x = 1;								//var di stato a 1 appena viene premuto il pulsante.
+	NVIC_DisableIRQ(EINTx_IRQn);			//disabilita l'interrupt di quel pulsante. x = numero del pulsante
+	LPC_PINCON->PINSEL4		&= ~(1 << 22);	//Setta la funzione del button a general (non più interrupt). 22 per eint1. Per altri vedi sezione buttons.
+	LPC_SC->EXTINT			&= (1 << 1);	//pulisce flag interrupt. 1 per EINT1. Per altri vedi IR.
+}
+
+
+In RIT lib:
+volatile int down_0 = 0;
+volatile int down_1 = 0;
+volatile int down_2 = 0;							//una variabile di stato per bottone.
+
+void RIT_IRQHandler (void){	
+
+	if(down_1 != 0){								//parte solo se down_1>0 → bottone è stato premuto. Inizio gestione SOLO bottone 1.
+		down_1 ++;
+		if((LPC_GPIO2->FIOPIN & (1<<11)) == 0){		//se il bottone è ancora premuto: 11esimo bit FIOPIN ==0 per pulsante 1. Per altri guarda tabella FIOPIN.
+		
+			switch(down_1){
+				case 2:								//se è la prima iterazione (quindi down_x==2) → gestisco la pressione del pulsante
+				
+					//gestione evento pressione
+				
+				default:							//se non è la prima iterazione
+					//gestione iterazioni successive. Evento pressione già gestito.
+			}
+		}
+		else {										//se il bottone non è più premuto
+			down_1 = 0;								//reset down
+			NVIC_EnableIRQ(EINTx_IRQn);				//abilita di nuovo l'interrupt iniziale del pulsante
+			LPC_PINCON->PINSEL4    |= (1 << 22);    //ri-set della funzione del pin 22 a external interrupt. 22 per EINT1. Per gli altri guarda PINSEL4.
+			
+		}
+	}											//fine gestione bottone 1.
+	
+	//Per gli altri scrivo una gestione per ogni pulsante.
+
+	reset_RIT();								//resetto RIT per poter triggerare un nuov RIT
+	LPC_RIT->RICTRL |= 0x1;						//reset flag interrupt RIT.
+	
+	return;
+}
+***********************************************************
+--------------------------------
+TOUCH SCREEN/LCD
+
+in main:
+LCD_Inizialization();			//inizializza LCD
+TP_Init();						//inizializza touch panel
+TouchPanel_Calibrate();			//calibrazione
+--------------------------------
+CLOCK/POWER CONTROL
+
+SYSTEM CONTROL REGISTERS pg 31
+	Set di registri che setuppano e controllano:
+	- Clock e funzioni relative: PLL0
+	- Contollo di potenza: PCON
+	
+CLOCK OSCILLATORS
+	- Main (xtal), da esterno: da 1 a 25 MHz		← uso questo a 12 MHz (già fisso su quello montato)
+	- Internal (IRC): 4 MHz fissi
+	- RTC, interno: 1 Hz fisso ma molto preciso
+
+CLOCK SOURCE SELECTION
+	Registro per settare il clock source del PLL0.
+	Bit [1-0] registro CLKSRC:
+		00	: Internal RC
+		01	: Main Oscillator (quello esterno)
+		10	: RTC
+		
+POWER CONTROL REGISTERS
+	2 registri:
+	- PCON (power control register):
+		Controlla alcune impostazioni.
+		bit [1-0] : setta la modalità di wfe/wfi :
+			- 00	→ entra in stato sleep o deep sleep a seconda del bit nel system control register (vedi sotto)
+			- 01	→ entra in power-down mode se il bit nel system control register ==1
+			- 11	→ entra in deep power-down mode se il bit nel system control register ==1
+	- PCONP (power control for peripherals) (table 46)
+		Permette di spegnere/accendere alcuni clock a moduli periferici. Ogni bit abilita e rende valida la lettura dal modulo associato.
+	
+SYSTEM CONTROL REGISTER 
+	Bit [2]:
+		- 0	:low energy mode = sleep mode
+		- 1	:low energy mode = deep sleep mode (evitare).
+		
+STATI
+	- Sleep mode: core stoppato, periferiche continuano a funzionare. Riduce consumo dinamico.
+	- Deep sleep mode: tutto viene fermato, eccetto RTC 			→ non utilizzare
+	- Power-down: come la deep sleep, spegne anche la memoria flash.
+	- Deep power-down: tutto spento eccetto RTC, reset pin e altra poca roba.
+		
+Per entrare in sleep mode in c:
+	__AMS ("wfi")
+	
