@@ -12,38 +12,6 @@ volatile int downj_right=0;
 volatile int downj_select=0;
 
 
-/*VERSIONE BOTTONE SINGOLO
-
-void RIT_IRQHandler (void) {			
-	static int down=0;													//down inizia a 1 la prima iterazione dell'handler (iterazione che conferma il press). 																						
-	down++;																			//le 	successive viene aumentato
-	if((LPC_GPIO2->FIOPIN & (1<<11)) == 0){			//se il bottone sta venendo premuto (stato pin FIOPIN[11] ==0 )
-		reset_RIT();															//reset RIT per permettere un nuovo RIT handler
-		switch(down){
-			case 1:																	//se è la prima iterazione gestisco la pressione del pulsante
-				//gestione evento pressione
-				break;
-			default:
-				//gestione RIT successivi al primo: il pulsante è tenuto premuto per più tempo
-				break;
-		}
-	}
-	else {																			//bottone rilasciato
-		down=0;																		//reset variabile
-		disable_RIT();														
-		reset_RIT();															//ferma e resetta RIT
-		NVIC_EnableIRQ(EINT1_IRQn);							 	//riabilita interruzione pulsante
-		LPC_PINCON->PINSEL4    |= (1 << 22);     	//reimposta funzione pin pulsante a external interrupt
-	}
-		
-	
-  LPC_RIT->RICTRL |= 0x1;											//clear flag interrupt
-	
-  return;
-} */
-
-
-
 void RIT_IRQHandler (void){	
 
 	if(down_0 != 0){														

@@ -46,7 +46,7 @@ void LED_All_Off (void){
 	}
 }
 
-void LED_blink (float sec, int n_timer){
+void LED_blink (float sec, int n_timer){				//TIMER INIT = 3
 	init_timer(n_timer, ((int)(sec*25000000)));
 	enable_timer(n_timer);
 }

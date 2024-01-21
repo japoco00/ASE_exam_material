@@ -29,6 +29,7 @@ void TIMER3_IRQHandler (void) {
 
 
 // DA AGGIUNGERE PER BLINK ALL'HANDLER DEL TIMER SCELTO
+// TIMER INIT VAL = 3
 
 	/*if(blink_status ==0 ){
 		LED_All_On();

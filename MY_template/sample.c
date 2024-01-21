@@ -29,7 +29,7 @@ int main (void) {
 	Se bottone singolo: attivo RIT direttamente nell'IRQ del bottone
 	*/
 	
-	//enable_RIT();												// RIT con più pulsanti o con joystick
+	enable_RIT();												// RIT con più pulsanti o con joystick
 	
 	//LCD_Initialization(); 							//Inizializza LCD
 	//TP_Init();													//Inizializza touch
