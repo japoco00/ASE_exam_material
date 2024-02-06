@@ -18,18 +18,14 @@ extern uint8_t ScaleFlag;
 
 int main (void) {
   	
-	SystemInit();  												/* System Initialization (i.e., PLL)  */
-  LED_init();                           /* LED Initialization                 */
-  BUTTON_init();												/* BUTTON Initialization              */
-	init_RIT(0x004C4B40);									/* RIT Initialization 50 msec       	*/
+	SystemInit();  												
+  LED_init();                           
+  BUTTON_init();												
+	init_RIT(0x004C4B40);									
 	joystick_init();
 	
-	/*
-	Se bottoni multipli: attivo rit in main e levo dagli IRQ dei pulsanti.
-	Se bottone singolo: attivo RIT direttamente nell'IRQ del bottone
-	*/
 	
-	enable_RIT();												// RIT con più pulsanti o con joystick
+	enable_RIT();												
 	
 	//LCD_Initialization(); 							//Inizializza LCD
 	//TP_Init();													//Inizializza touch
